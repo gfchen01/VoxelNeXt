@@ -1,4 +1,4 @@
-CLASS_NAMES: ["chair", "sofa", "lamp", "table", "cabinet", "desk", "bed", "coffee table", "bench", "refridgerator"]
+CLASS_NAMES: ['Car', 'Pedestrian', 'Cyclist']
 
 DATA_CONFIG:
     _BASE_CONFIG_: cfgs/dataset_configs/kitti_dataset.yaml
@@ -11,11 +11,11 @@ DATA_CONFIG:
               DB_INFO_PATH:
                   - kitti_dbinfos_train.pkl
               PREPARE: {
-                 filter_by_min_points: ["chair:5", "sofa:5", "lamp:5", "table:5", "cabinet:5", "desk:5", "bed:5", "coffee table:5", "bench:5", "refridgerator:5"],
-                 filter_by_difficulty: [],
+                 filter_by_min_points: ['Car:5', 'Pedestrian:5', 'Cyclist:5'],
+                 filter_by_difficulty: [-1],
               }
 
-              SAMPLE_GROUPS: ["chair:15", "sofa:15", "lamp:15", "table:15", "cabinet:15", "desk:15", "bed:15", "coffee table:15", "bench:15", "refridgerator:15"]
+              SAMPLE_GROUPS: ['Car:15','Pedestrian:10', 'Cyclist:10']
               NUM_POINT_FEATURES: 4
               DATABASE_WITH_FAKELIDAR: False
               REMOVE_EXTRA_WIDTH: [0.0, 0.0, 0.0]
@@ -45,7 +45,7 @@ MODEL:
         INPUT_FEATURES: 128
 
         CLASS_NAMES_EACH_HEAD: [
-            ["chair", "sofa", "lamp", "table", "cabinet", "desk", "bed", "coffee table", "bench", "refridgerator"   ],
+            ['Car', 'Pedestrian', 'Cyclist'],
         ]
         
         SHARED_CONV_CHANNEL: 128
@@ -77,7 +77,7 @@ MODEL:
 
         POST_PROCESSING:
             SCORE_THRESH: 0.1
-            POST_CENTER_LIMIT_RANGE: [-34.8187, -32.6075, -0.758957, 30.4048, 30.8555, 6.49894]
+            POST_CENTER_LIMIT_RANGE: [0, -40, -3, 70.4, 40, 1]
             MAX_OBJ_PER_SAMPLE: 500
             NMS_CONFIG:
                 NMS_TYPE: nms_gpu

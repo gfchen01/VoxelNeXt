@@ -47,7 +47,7 @@ class DemoDataset(DatasetTemplate):
         if self.ext == '.bin':
             points = np.fromfile(self.sample_file_list[index], dtype=np.float32).reshape(-1, 4)
         elif self.ext == '.npy':
-            points = np.load(self.sample_file_list[index])
+            points = np.load(self.sample_file_list[index], allow_pickle=True)
         else:
             raise NotImplementedError
 
@@ -95,6 +95,7 @@ def main():
             logger.info(f'Visualized sample index: \t{idx + 1}')
             data_dict = demo_dataset.collate_batch([data_dict])
             load_data_to_gpu(data_dict)
+            print(data_dict)
             pred_dicts, _ = model.forward(data_dict)
 
             V.draw_scenes(

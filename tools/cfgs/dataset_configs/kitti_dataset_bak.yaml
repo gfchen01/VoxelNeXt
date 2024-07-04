@@ -1,7 +1,7 @@
 DATASET: 'KittiDataset'
-DATA_PATH: '../data/custom_data_v4'
+DATA_PATH: '../data/kitti'
 
-POINT_CLOUD_RANGE: [-34.8187, -32.6075, -0.974, 30.4048, 30.8555, 6.49894]
+POINT_CLOUD_RANGE: [0, -40, -3, 70.4, 40, 1]
 
 DATA_SPLIT: {
     'train': train,
@@ -24,11 +24,11 @@ DATA_AUGMENTOR:
           DB_INFO_PATH:
               - kitti_dbinfos_train.pkl
           PREPARE: {
-             filter_by_min_points: ["chair:5", "lamp:5", "sofa:5", "table:5", "desk:5", "bench:5", "bed:5"],
-             filter_by_difficulty: [],
+             filter_by_min_points: ['Car:5', 'Pedestrian:5', 'Cyclist:5'],
+             filter_by_difficulty: [-1],
           }
 
-          SAMPLE_GROUPS: ["chair:15", "lamp:15", "sofa:15", "table:15", "desk:15", "bench:15", "bed:15"]
+          SAMPLE_GROUPS: ['Car:20','Pedestrian:15', 'Cyclist:15']
           NUM_POINT_FEATURES: 4
           DATABASE_WITH_FAKELIDAR: False
           REMOVE_EXTRA_WIDTH: [0.0, 0.0, 0.0]
@@ -62,7 +62,7 @@ DATA_PROCESSOR:
       }
 
     - NAME: transform_points_to_voxels
-      VOXEL_SIZE: [0.092, 0.9, 0.14]
+      VOXEL_SIZE: [0.05, 0.05, 0.1]
       MAX_POINTS_PER_VOXEL: 5
       MAX_NUMBER_OF_VOXELS: {
         'train': 16000,

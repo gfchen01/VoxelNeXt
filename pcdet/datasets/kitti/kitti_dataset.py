@@ -9,6 +9,7 @@ from ...ops.roiaware_pool3d import roiaware_pool3d_utils
 from ...utils import box_utils, calibration_kitti, common_utils, object3d_kitti
 from ..dataset import DatasetTemplate
 
+import open3d as o3d
 
 class KittiDataset(DatasetTemplate):
     def __init__(self, dataset_cfg, class_names, training=True, root_path=None, logger=None):
@@ -61,9 +62,13 @@ class KittiDataset(DatasetTemplate):
         self.sample_id_list = [x.strip() for x in open(split_dir).readlines()] if split_dir.exists() else None
 
     def get_lidar(self, idx):
-        lidar_file = self.root_split_path / 'velodyne' / ('%s.bin' % idx)
+        lidar_file = self.root_split_path / 'velodyne' / ('%s.ply' % idx)
         assert lidar_file.exists()
-        return np.fromfile(str(lidar_file), dtype=np.float32).reshape(-1, 4)
+        pcd = o3d.io.read_point_cloud(str(lidar_file))
+        points = np.asarray(pcd.points)
+        dummy_intensity = np.zeros((points.shape[0], 1))
+        points = np.concatenate((points, dummy_intensity), axis=1)
+        return points
 
     def get_image(self, idx):
         """
@@ -478,7 +483,16 @@ if __name__ == '__main__':
         ROOT_DIR = (Path(__file__).resolve().parent / '../../../').resolve()
         create_kitti_infos(
             dataset_cfg=dataset_cfg,
-            class_names=['Car', 'Pedestrian', 'Cyclist'],
-            data_path=ROOT_DIR / 'data' / 'kitti',
-            save_path=ROOT_DIR / 'data' / 'kitti'
+            class_names=["chair", 
+                         "sofa", 
+                         "lamp", 
+                         "table", 
+                         "cabinet", 
+                         "desk", 
+                         "bed", 
+                         "coffee table", 
+                         "bench", 
+                         "refridgerator"],
+            data_path=ROOT_DIR / 'data' / 'custom_data_v4',
+            save_path=ROOT_DIR / 'data' / 'custom_data_v4'
         )

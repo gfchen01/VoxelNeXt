@@ -9,7 +9,14 @@ def get_objects_from_label(label_file):
 
 
 def cls_type_to_id(cls_type):
-    type_to_id = {'Car': 1, 'Pedestrian': 2, 'Cyclist': 3, 'Van': 4}
+    type_to_id = {'chair': 0, 
+                  'table': 1, 
+                  'lamp': 2, 
+                  'sofa': 3,
+                  'cabinet': 4,
+                  'coffee table': 5,
+                  'bed': 6,
+                  'refridgerator': 7,}
     if cls_type not in type_to_id.keys():
         return -1
     return type_to_id[cls_type]
@@ -17,7 +24,7 @@ def cls_type_to_id(cls_type):
 
 class Object3d(object):
     def __init__(self, line):
-        label = line.strip().split(' ')
+        label = line.strip().split(',')
         self.src = line
         self.cls_type = label[0]
         self.cls_id = cls_type_to_id(self.cls_type)

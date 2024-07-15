@@ -273,6 +273,11 @@ def _topk_1d(scores, batch_size, batch_idx, obj, K=40, nuscenes=False):
         topk_inds_list.append(topk_inds)
         topk_classes_list.append(topk_classes)
 
+    # for item in topk_score_list:
+    #     print(item.shape)
+    #     print(item)
+    #     print('---')
+    
     topk_score = torch.stack(topk_score_list)
     topk_inds = torch.stack(topk_inds_list)
     topk_classes = torch.stack(topk_classes_list)

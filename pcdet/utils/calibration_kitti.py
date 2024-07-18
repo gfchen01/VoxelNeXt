@@ -1,4 +1,5 @@
 import numpy as np
+import yaml
 
 
 def get_calib_from_file(calib_file):
@@ -13,11 +14,14 @@ def get_calib_from_file(calib_file):
     R0 = np.array(obj, dtype=np.float32)
     obj = lines[5].strip().split(' ')[1:]
     Tr_velo_to_cam = np.array(obj, dtype=np.float32)
+    obj = lines[7].strip().split(' ')[1:]
+    Tr_velo_to_world = np.array(obj, dtype=np.float32)
 
     return {'P2': P2.reshape(3, 4),
             'P3': P3.reshape(3, 4),
             'R0': R0.reshape(3, 3),
-            'Tr_velo2cam': Tr_velo_to_cam.reshape(3, 4)}
+            'Tr_velo2cam': Tr_velo_to_cam.reshape(3, 4),
+            'Tr_velo2world': Tr_velo_to_world.reshape(3, 4)}
 
 
 class Calibration(object):
@@ -30,7 +34,34 @@ class Calibration(object):
         self.P2 = calib['P2']  # 3 x 4
         self.R0 = calib['R0']  # 3 x 3
         self.V2C = calib['Tr_velo2cam']  # 3 x 4
-
+        # self.V2W = np.concatenate([calib['Tr_velo2world'], np.array([[0, 0, 0, 1]])], axis=0) # 4 x 4
+        
+        # print('t: ', self.V2W)
+        # self.W2V = np.zeros_like(self.V2W)
+        # self.W2V[:3, :3] = self.V2W[:3, :3].T
+        # self.W2V[:3, 3] = -self.V2W[:3, :3].T @ self.V2W[:3, 3]
+        # self.W2V[3, 3] = 1
+        # print(self.W2V)
+        # exit()
+        with open(calib_file, 'r') as file:
+            calib_data = yaml.safe_load(file)
+        
+        lidar_transform_raw = list(map(float, calib_data['Tr_velo_to_world'].split()))
+        lidar_transform = np.array([[lidar_transform_raw[0], lidar_transform_raw[1], lidar_transform_raw[2], lidar_transform_raw[3]],
+                                    [lidar_transform_raw[4], lidar_transform_raw[5], lidar_transform_raw[6], lidar_transform_raw[7]],
+                                    [lidar_transform_raw[8], lidar_transform_raw[9], lidar_transform_raw[10], lidar_transform_raw[11]],
+                                    [0, 0, 0, 1]])
+        
+        # yaw_robot = np.arctan2(lidar_transform[1, 0], lidar_transform[0, 0])
+        
+        # print('t: ', lidar_transform)
+        lidar_transform_inv = np.zeros_like(lidar_transform)
+        lidar_transform_inv[:3, :3] = lidar_transform[:3, :3].T
+        lidar_transform_inv[:3, 3] = -lidar_transform[:3, :3].T @ lidar_transform[:3, 3]
+        lidar_transform_inv[3, 3] = 1
+        # print('t inv: ', lidar_transform_inv)
+        self.W2V = lidar_transform_inv
+        
         # Camera intrinsics and extrinsics
         self.cu = self.P2[0, 2]
         self.cv = self.P2[1, 2]

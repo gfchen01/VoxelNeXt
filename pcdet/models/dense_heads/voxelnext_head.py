@@ -417,7 +417,6 @@ class VoxelNeXtHead(nn.Module):
 
     def generate_predicted_boxes(self, batch_size, pred_dicts, voxel_indices, spatial_shape):
         post_process_cfg = self.model_cfg.POST_PROCESSING
-        print(f'post center limit range: {post_process_cfg.POST_CENTER_LIMIT_RANGE}')
         post_center_limit_range = torch.tensor(post_process_cfg.POST_CENTER_LIMIT_RANGE).cuda().float()
 
         ret_dict = [{

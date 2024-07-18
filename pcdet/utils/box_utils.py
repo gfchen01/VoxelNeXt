@@ -20,7 +20,7 @@ def in_hull(p, hull):
         flag = hull.find_simplex(p) >= 0
     except scipy.spatial.qhull.QhullError:
         print('Warning: not a hull %s' % str(hull))
-        flag = np.zeros(p.shape[0], dtype=np.bool)
+        flag = np.zeros(p.shape[0], dtype=bool)
 
     return flag
 
@@ -146,7 +146,7 @@ def boxes3d_kitti_camera_to_lidar(boxes3d_camera, calib):
     l, h, w = boxes3d_camera_copy[:, 3:4], boxes3d_camera_copy[:, 4:5], boxes3d_camera_copy[:, 5:6]
 
     xyz_lidar = calib.rect_to_lidar(xyz_camera)
-    xyz_lidar[:, 2] += h[:, 0] / 2
+    # xyz_lidar[:, 2] += h[:, 0] / 2
     return np.concatenate([xyz_lidar, l, w, h, -(r + np.pi / 2)], axis=-1)
 
 

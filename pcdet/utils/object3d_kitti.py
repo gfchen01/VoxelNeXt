@@ -24,6 +24,7 @@ def cls_type_to_id(cls_type):
 
 class Object3d(object):
     def __init__(self, line):
+        # label = line.strip().split(' ')
         label = line.strip().split(',')
         self.src = line
         self.cls_type = label[0]

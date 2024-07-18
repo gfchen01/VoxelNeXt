@@ -3,13 +3,13 @@ import pickle
 
 import numpy as np
 from skimage import io
+import open3d as o3d
 
 from . import kitti_utils
 from ...ops.roiaware_pool3d import roiaware_pool3d_utils
 from ...utils import box_utils, calibration_kitti, common_utils, object3d_kitti
 from ..dataset import DatasetTemplate
 
-import open3d as o3d
 
 class KittiDataset(DatasetTemplate):
     def __init__(self, dataset_cfg, class_names, training=True, root_path=None, logger=None):
@@ -61,14 +61,65 @@ class KittiDataset(DatasetTemplate):
         split_dir = self.root_path / 'ImageSets' / (self.split + '.txt')
         self.sample_id_list = [x.strip() for x in open(split_dir).readlines()] if split_dir.exists() else None
 
+    # def get_lidar(self, idx):
+    #     lidar_file = self.root_split_path / 'velodyne' / ('%s.bin' % idx)
+    #     assert lidar_file.exists()
+    #     return np.fromfile(str(lidar_file), dtype=np.float32).reshape(-1, 4)
+    
     def get_lidar(self, idx):
         lidar_file = self.root_split_path / 'velodyne' / ('%s.ply' % idx)
         assert lidar_file.exists()
-        pcd = o3d.io.read_point_cloud(str(lidar_file))
-        points = np.asarray(pcd.points)
-        dummy_intensity = np.zeros((points.shape[0], 1))
-        points = np.concatenate((points, dummy_intensity), axis=1)
-        return points
+        mesh = o3d.io.read_triangle_mesh(str(lidar_file))
+        mesh = np.asarray(mesh.vertices)
+        return np.hstack([mesh, np.zeros((mesh.shape[0], 1))])
+    
+    def get_lidar_stacked(self, idx, calib):
+        # unity_environment_change_idx = {'data_homebuilding1_traj3': [0, 389], 'data_homebuilding2_traj1': [390, 902], 'data_homebuilding3_traj1': [903, 1238], 'data_homebuilding1_traj2': [1239, 1897], 'data_homebuilding2_traj2': [1898, 2507], 'data_homebuilding1_traj1': [2508, 3295], 'data_homebuilding3_traj2': [3296, 3614]}
+        unity_environment_change_idx = {'data_homebuilding1_traj3': [0, 318]}
+        # find min and max index allowed
+        # print('ye kya hai: ', int(idx))
+        for env in unity_environment_change_idx:
+            if int(idx) >= unity_environment_change_idx[env][0] and int(idx) <= unity_environment_change_idx[env][1]:
+                # print(i, int(idx), unity_environment_change_idx[i])
+                min_idx_allowed = unity_environment_change_idx[env][0]
+                max_idx_allowed = unity_environment_change_idx[env][1]
+                # print(min_idx_allowed, max_idx_allowed)
+                break
+        meshes = []
+        curr_idx = int(idx)
+        # print('og: ', curr_idx)
+        for i in range(-9, 1, 1):
+            index = curr_idx + i
+            # print(index)
+            if index < min_idx_allowed:
+                index = max_idx_allowed - abs(min_idx_allowed - index)
+            if index > max_idx_allowed:
+                index = min_idx_allowed + abs(index - max_idx_allowed)
+                
+            index = '{:06d}'.format(index)
+            
+            lidar_file = self.root_split_path / 'velodyne_world' / ('%s.ply' % index)
+            try:
+                assert lidar_file.exists()
+            except:
+                print('can\'t find this file: ', index)
+                
+            mesh = o3d.io.read_triangle_mesh(str(lidar_file))
+            mesh = np.asarray(mesh.vertices)
+            
+            if len(meshes) == 0:
+                meshes = copy.deepcopy(mesh)
+            else:
+                meshes = np.concatenate([meshes, mesh], axis=0)
+            # print('curr idx: ', i, index, meshes.shape)
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(meshes)
+        
+        transformed_point_cloud = pcd.transform(calib.W2V)
+        
+        mesh = np.asarray(transformed_point_cloud.points)
+        
+        return np.hstack([mesh, np.zeros((mesh.shape[0], 1))])
 
     def get_image(self, idx):
         """
@@ -198,8 +249,10 @@ class KittiDataset(DatasetTemplate):
                 rots = annotations['rotation_y'][:num_objects]
                 loc_lidar = calib.rect_to_lidar(loc)
                 l, h, w = dims[:, 0:1], dims[:, 1:2], dims[:, 2:3]
-                loc_lidar[:, 2] += h[:, 0] / 2
-                gt_boxes_lidar = np.concatenate([loc_lidar, l, w, h, -(np.pi / 2 + rots[..., np.newaxis])], axis=1)
+                # loc_lidar[:, 2] += h[:, 0] / 2
+                rots = rots.reshape(-1,1)
+                gt_boxes_lidar = np.concatenate([loc_lidar, l, w, h, rots], axis=1)
+                # gt_boxes_lidar = np.concatenate([loc_lidar, l, w, h, -(np.pi / 2 + rots[..., np.newaxis])], axis=1)
                 annotations['gt_boxes_lidar'] = gt_boxes_lidar
 
                 info['annos'] = annotations
@@ -366,6 +419,40 @@ class KittiDataset(DatasetTemplate):
         ap_result_str, ap_dict = kitti_eval.get_official_eval_result(eval_gt_annos, eval_det_annos, class_names)
 
         return ap_result_str, ap_dict
+    
+    def filter_bbox_based_on_count(self, point_cloud, bounding_boxes, gt_names, sample_idx, min_num_points=100):
+        boxes_lidar = box_utils.boxes_to_corners_3d(bounding_boxes)
+        boxes_lidar = np.transpose(boxes_lidar, (0, 2, 1))
+
+        counts = np.zeros(len(boxes_lidar), dtype=int)
+
+        # print('boxes_lidar: ', boxes_lidar.shape)
+        # print('gt names: ', gt_names.shape)
+        # print('point cloud: ', point_cloud)
+        for i, box in enumerate(boxes_lidar):
+            # print(gt_names.shape, box)
+            xmin, ymin, zmin, xmax, ymax, zmax = np.min(box[0]), np.min(box[1]), np.min(box[2]), np.max(box[0]), np.max(box[1]), np.max(box[2])
+            # print(gt_names.shape, xmin, ymin, zmin, xmax, ymax, zmax)
+            # Logical check for each dimension
+            within_x = (point_cloud[:, 0] >= xmin) & (point_cloud[:, 0] <= xmax)
+            within_y = (point_cloud[:, 1] >= ymin) & (point_cloud[:, 1] <= ymax)
+            within_z = (point_cloud[:, 2] >= zmin) & (point_cloud[:, 2] <= zmax)
+            
+            # Combine all dimensions
+            within_box = within_x & within_y & within_z
+            
+            # Count points within the current bounding box
+            counts[i] = np.sum(within_box)
+            # print('count: ', i, counts[i])
+        
+        mask_based_on_counts = counts > min_num_points
+        
+        # print('mask based on counts: ', mask_based_on_counts)
+        # print('counts: ', counts)
+        if True not in mask_based_on_counts:
+            print("No bbox found.....issue:   ", sample_idx)
+            exit()
+        return bounding_boxes[mask_based_on_counts], gt_names[mask_based_on_counts]
 
     def __len__(self):
         if self._merge_all_iters_to_one_epoch:
@@ -374,13 +461,14 @@ class KittiDataset(DatasetTemplate):
         return len(self.kitti_infos)
 
     def __getitem__(self, index):
-        # index = 4
+        # index = 909
         if self._merge_all_iters_to_one_epoch:
             index = index % len(self.kitti_infos)
 
         info = copy.deepcopy(self.kitti_infos[index])
 
         sample_idx = info['point_cloud']['lidar_idx']
+
         img_shape = info['image']['image_shape']
         calib = self.get_calib(sample_idx)
         get_item_list = self.dataset_cfg.get('GET_ITEM_LIST', ['points'])
@@ -389,15 +477,44 @@ class KittiDataset(DatasetTemplate):
             'frame_id': sample_idx,
             'calib': calib,
         }
+        # print(input_dict['frame_id'])
 
+        if "points" in get_item_list:
+            points = self.get_lidar_stacked(sample_idx, calib)
+            # if self.dataset_cfg.FOV_POINTS_ONLY:
+            #     pts_rect = calib.lidar_to_rect(points[:, 0:3])
+            #     fov_flag = self.get_fov_flag(pts_rect, img_shape, calib)
+            #     points = points[fov_flag]
+            input_dict['points'] = points
+            
         if 'annos' in info:
+            obj_list = self.get_label(sample_idx)
             annos = info['annos']
             annos = common_utils.drop_info_with_name(annos, name='DontCare')
-            loc, dims, rots = annos['location'], annos['dimensions'], annos['rotation_y']
-            gt_names = annos['name']
-            gt_boxes_camera = np.concatenate([loc, dims, rots[..., np.newaxis]], axis=1).astype(np.float32)
-            gt_boxes_lidar = box_utils.boxes3d_kitti_camera_to_lidar(gt_boxes_camera, calib)
+            
+            annotations = {}
+            annotations['dimensions'] = np.array([[obj.l, obj.h, obj.w] for obj in obj_list])  # lhw(camera) format
+            annotations['location'] = np.concatenate([obj.loc.reshape(1, 3) for obj in obj_list], axis=0)
+            annotations['rotation_y'] = np.array([obj.ry for obj in obj_list])
 
+            num_objects = len([obj.cls_type for obj in obj_list if obj.cls_type != 'DontCare'])
+                
+            loc = annotations['location'][:num_objects]
+            dims = annotations['dimensions'][:num_objects]
+            rots = annotations['rotation_y'][:num_objects]
+            # loc, dims, rots = annos['location'], annos['dimensions'], annos['rotation_y']
+            gt_names = annos['name']
+            # gt_boxes_camera = np.concatenate([loc, dims, rots[..., np.newaxis]], axis=1).astype(np.float32)
+            # gt_boxes_lidar = box_utils.boxes3d_kitti_camera_to_lidar(gt_boxes_camera, calib)
+            
+            loc_lidar = calib.rect_to_lidar(loc)
+            l, h, w = dims[:, 0:1], dims[:, 1:2], dims[:, 2:3]
+            # loc_lidar[:, 2] += h[:, 0] / 2
+            rots = rots.reshape(-1,1)
+            gt_boxes_lidar = np.concatenate([loc_lidar, l, w, h, rots], axis=1)
+            
+            gt_boxes_lidar, gt_names = self.filter_bbox_based_on_count(input_dict['points'], gt_boxes_lidar, gt_names, sample_idx) # place this somewhere up coz you have to fler all bbox properties
+                
             input_dict.update({
                 'gt_names': gt_names,
                 'gt_boxes': gt_boxes_lidar
@@ -408,14 +525,6 @@ class KittiDataset(DatasetTemplate):
             road_plane = self.get_road_plane(sample_idx)
             if road_plane is not None:
                 input_dict['road_plane'] = road_plane
-
-        if "points" in get_item_list:
-            points = self.get_lidar(sample_idx)
-            if self.dataset_cfg.FOV_POINTS_ONLY:
-                pts_rect = calib.lidar_to_rect(points[:, 0:3])
-                fov_flag = self.get_fov_flag(pts_rect, img_shape, calib)
-                points = points[fov_flag]
-            input_dict['points'] = points
 
         if "images" in get_item_list:
             input_dict['images'] = self.get_image(sample_idx)

@@ -639,16 +639,19 @@ def do_coco_style_eval(gt_annos, dt_annos, current_classes, overlap_ranges,
 def get_official_eval_result(gt_annos, dt_annos, current_classes, PR_detail_dict=None):
     # overlap_0_7 = np.array([[0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1], [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1], [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]])
     overlap_0_1 = np.array([[0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1], [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1], [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]])
-    min_overlaps = np.stack([overlap_0_1], axis=0)  # [2, 3, 5]
-    # class_to_name = {
-    #     0: 'Car',
-    #     1: 'Pedestrian',
-    #     2: 'Cyclist',
-    #     3: 'Van',
-    #     4: 'Person_sitting',
-    #     5: 'Truck'
-    # }
-    class_to_name = {0:"chair", 1:"sofa", 2:"lamp", 3:"table", 4:"cabinet", 5:"desk", 6:"bed", 7:"coffee table", 8:"bench", 9:"refridgerator"}
+    min_overlaps = np.stack([overlap_0_1], axis=0)  # [2, 3, 5]=
+    class_to_name = class_to_name = {
+        0: 'chair',
+        1: 'sofa',
+        2: 'lamp',
+        3: 'table',
+        4: 'cabinet',
+        5: 'desk',
+        6: 'bed',
+        7: 'coffee table',
+        8: 'bench',
+        9: 'refridgerator',
+    }
     name_to_class = {v: n for n, v in class_to_name.items()}
     if not isinstance(current_classes, (list, tuple)):
         current_classes = [current_classes]

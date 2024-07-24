@@ -9,14 +9,18 @@ def get_objects_from_label(label_file):
 
 
 def cls_type_to_id(cls_type):
-    type_to_id = {'chair': 0, 
-                  'table': 1, 
-                  'lamp': 2, 
-                  'sofa': 3,
-                  'cabinet': 4,
-                  'coffee table': 5,
-                  'bed': 6,
-                  'refridgerator': 7,}
+    type_to_id = {
+        0: 'chair',
+        1: 'sofa',
+        2: 'lamp',
+        3: 'table',
+        4: 'cabinet',
+        5: 'desk',
+        6: 'bed',
+        7: 'coffee table',
+        8: 'bench',
+        9: 'refridgerator',
+        }
     if cls_type not in type_to_id.keys():
         return -1
     return type_to_id[cls_type]

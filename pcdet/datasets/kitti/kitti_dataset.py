@@ -40,7 +40,9 @@ class KittiDataset(DatasetTemplate):
 
         for info_path in self.dataset_cfg.INFO_PATH[mode]:
             info_path = self.root_path / info_path
+            print(info_path)
             if not info_path.exists():
+                print('file not exist')
                 continue
             with open(info_path, 'rb') as f:
                 infos = pickle.load(f)
@@ -69,13 +71,12 @@ class KittiDataset(DatasetTemplate):
     def get_lidar(self, idx):
         lidar_file = self.root_split_path / 'velodyne' / ('%s.ply' % idx)
         assert lidar_file.exists()
-        mesh = o3d.io.read_triangle_mesh(str(lidar_file))
-        mesh = np.asarray(mesh.vertices)
-        return np.hstack([mesh, np.zeros((mesh.shape[0], 1))])
+        pcd = o3d.io.read_point_cloud(str(lidar_file))
+        pcd = np.asarray(pcd.points)
+        return np.hstack([pcd, np.zeros((pcd.shape[0], 1))])
     
     def get_lidar_stacked(self, idx, calib):
-        # unity_environment_change_idx = {'data_homebuilding1_traj3': [0, 389], 'data_homebuilding2_traj1': [390, 902], 'data_homebuilding3_traj1': [903, 1238], 'data_homebuilding1_traj2': [1239, 1897], 'data_homebuilding2_traj2': [1898, 2507], 'data_homebuilding1_traj1': [2508, 3295], 'data_homebuilding3_traj2': [3296, 3614]}
-        unity_environment_change_idx = {'data_homebuilding1_traj3': [0, 318]}
+        unity_environment_change_idx = {'data_homebuilding3_traj1': [0, 335], 'data_homebuilding2_traj1': [336, 848], 'data_homebuilding1_traj2': [849, 1507], 'data_homebuilding3_traj2': [1508, 1826], 'data_homebuilding1_traj3': [1827, 2216], 'data_homebuilding2_traj2': [2217, 2826], 'data_homebuilding1_traj1': [2827, 3614]}
         # find min and max index allowed
         # print('ye kya hai: ', int(idx))
         for env in unity_environment_change_idx:
@@ -104,13 +105,13 @@ class KittiDataset(DatasetTemplate):
             except:
                 print('can\'t find this file: ', index)
                 
-            mesh = o3d.io.read_triangle_mesh(str(lidar_file))
-            mesh = np.asarray(mesh.vertices)
+            pcd = o3d.io.read_point_cloud(str(lidar_file))
+            pcd = np.asarray(pcd.points)
             
             if len(meshes) == 0:
-                meshes = copy.deepcopy(mesh)
+                meshes = copy.deepcopy(pcd)
             else:
-                meshes = np.concatenate([meshes, mesh], axis=0)
+                meshes = np.concatenate([meshes, pcd], axis=0)
             # print('curr idx: ', i, index, meshes.shape)
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(meshes)
@@ -592,16 +593,16 @@ if __name__ == '__main__':
         ROOT_DIR = (Path(__file__).resolve().parent / '../../../').resolve()
         create_kitti_infos(
             dataset_cfg=dataset_cfg,
-            class_names=["chair", 
-                         "sofa", 
-                         "lamp", 
-                         "table", 
-                         "cabinet", 
-                         "desk", 
-                         "bed", 
-                         "coffee table", 
-                         "bench", 
-                         "refridgerator"],
+            class_names=['chair', 
+                         'sofa', 
+                         'lamp', 
+                         'table', 
+                         'cabinet', 
+                         'desk', 
+                         'bed', 
+                         'coffee table', 
+                         'bench', 
+                         'refridgerator'],
             data_path=ROOT_DIR / 'data' / 'custom_data_v4',
             save_path=ROOT_DIR / 'data' / 'custom_data_v4'
         )

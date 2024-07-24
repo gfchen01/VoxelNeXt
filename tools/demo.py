@@ -19,6 +19,7 @@ from pcdet.datasets import DatasetTemplate
 from pcdet.models import build_network, load_data_to_gpu
 from pcdet.utils import common_utils
 
+from pcdet.datasets.kitti.kitti_dataset import KittiDataset
 
 class DemoDataset(DatasetTemplate):
     def __init__(self, dataset_cfg, class_names, training=True, root_path=None, logger=None, ext='.bin'):
@@ -88,47 +89,55 @@ def main():
     args, cfg = parse_config()
     logger = common_utils.create_logger()
     logger.info('-----------------Quick Demo of OpenPCDet-------------------------')
-    dummy_demo_dataset = DemoDataset(
-        dataset_cfg=cfg.DATA_CONFIG, class_names=cfg.CLASS_NAMES, training=False,
-        root_path=Path(args.data_path), ext=args.ext, logger=logger
-    )
-    logger.info(f'Total number of samples: \t{len(dummy_demo_dataset)}')
+    
+    # demo_dataset = DemoDataset(
+    #     dataset_cfg=cfg.DATA_CONFIG, class_names=cfg.CLASS_NAMES, training=False,
+    #     root_path=Path(args.data_path), ext=args.ext, logger=logger
+    # )
 
-    model = build_network(model_cfg=cfg.MODEL, num_class=len(cfg.CLASS_NAMES), dataset=dummy_demo_dataset)
+    demo_dataset = KittiDataset(
+        dataset_cfg=cfg.DATA_CONFIG, 
+        class_names=cfg.CLASS_NAMES, 
+        training=False,
+        root_path=Path(args.data_path), 
+        logger=logger
+    )
+
+    logger.info(f'Total number of samples: \t{len(demo_dataset)}')
+
+    model = build_network(model_cfg=cfg.MODEL, num_class=len(cfg.CLASS_NAMES), dataset=demo_dataset)
     model.load_params_from_file(filename=args.ckpt, logger=logger, to_cpu=True)
     model.cuda()
     model.eval()
-    
-    example_file_path = '../data/000006.npy'
-    
+
     with torch.no_grad():
-        # for idx, data_dict in enumerate(demo_dataset):
-        #     logger.info(f'Visualized sample index: \t{idx + 1}')
-        #     data_dict = demo_dataset.collate_batch([data_dict])
-        #     load_data_to_gpu(data_dict)
-        #     pred_dicts, _ = model.forward(data_dict)
+        for idx, data_dict in enumerate(demo_dataset):
+            logger.info(f'Visualized sample index: \t{idx + 1}')
+            data_dict = demo_dataset.collate_batch([data_dict])
+            load_data_to_gpu(data_dict)
+            pred_dicts, _ = model.forward(data_dict)
 
-        #     V.draw_scenes(
-        #         points=data_dict['points'][:, 1:], ref_boxes=pred_dicts[0]['pred_boxes'],
-        #         ref_scores=pred_dicts[0]['pred_scores'], ref_labels=pred_dicts[0]['pred_labels']
-        #     )
+            V.draw_scenes(
+                points=data_dict['points'][:, 1:], ref_boxes=pred_dicts[0]['pred_boxes'],
+                ref_scores=pred_dicts[0]['pred_scores'], ref_labels=pred_dicts[0]['pred_labels']
+            )
 
-        #     if not OPEN3D_FLAG:
-        #         mlab.show(stop=True)
+            if not OPEN3D_FLAG:
+                mlab.show(stop=True)
                 
-        points = np.load(example_file_path, allow_pickle=True)
-        frame_data_dict = dummy_demo_dataset.build_frame_data_dict(points)
-        frame_data_dict = dummy_demo_dataset.collate_batch([frame_data_dict])
-        load_data_to_gpu(frame_data_dict)
-        pred_dicts, _ = model.forward(frame_data_dict)
+        # points = np.load(example_file_path, allow_pickle=True)
+        # frame_data_dict = dummy_demo_dataset.build_frame_data_dict(points)
+        # frame_data_dict = dummy_demo_dataset.collate_batch([frame_data_dict])
+        # load_data_to_gpu(frame_data_dict)
+        # pred_dicts, _ = model.forward(frame_data_dict)
 
-        V.draw_scenes(
-            points=frame_data_dict['points'][:, 1:], ref_boxes=pred_dicts[0]['pred_boxes'],
-            ref_scores=pred_dicts[0]['pred_scores'], ref_labels=pred_dicts[0]['pred_labels']
-        )
+        # V.draw_scenes(
+        #     points=frame_data_dict['points'][:, 1:], ref_boxes=pred_dicts[0]['pred_boxes'],
+        #     ref_scores=pred_dicts[0]['pred_scores'], ref_labels=pred_dicts[0]['pred_labels']
+        # )
 
-        if not OPEN3D_FLAG:
-            mlab.show(stop=True)
+        # if not OPEN3D_FLAG:
+        #     mlab.show(stop=True)
 
     logger.info('Demo done.')
 

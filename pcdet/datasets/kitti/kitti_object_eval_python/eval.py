@@ -28,7 +28,7 @@ def get_thresholds(scores: np.ndarray, num_gt, num_sample_pts=41):
 
 
 def clean_data(gt_anno, dt_anno, current_class, difficulty):
-    CLASS_NAMES = ["chair", "sofa", "lamp", "table", "cabinet", "desk", "bed", "coffee table", "bench", "refridgerator"]
+    CLASS_NAMES = ["chair", "sofa", "lamp", "table", "cabinet", "desk", "bed", "bench", "refridgerator"]
     MIN_HEIGHT = [40, 25, 25]
     MAX_OCCLUSION = [0, 1, 2]
     MAX_TRUNCATION = [0.15, 0.3, 0.5]
@@ -648,9 +648,8 @@ def get_official_eval_result(gt_annos, dt_annos, current_classes, PR_detail_dict
         4: 'cabinet',
         5: 'desk',
         6: 'bed',
-        7: 'coffee table',
-        8: 'bench',
-        9: 'refridgerator',
+        7: 'bench',
+        8: 'refridgerator',
     }
     name_to_class = {v: n for n, v in class_to_name.items()}
     if not isinstance(current_classes, (list, tuple)):

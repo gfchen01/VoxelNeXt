@@ -68,15 +68,49 @@ class KittiDataset(DatasetTemplate):
     #     assert lidar_file.exists()
     #     return np.fromfile(str(lidar_file), dtype=np.float32).reshape(-1, 4)
     
+    def read_ply(self, filename):
+        """Custom read ply. Points: [x, y, z, id] = [float, float, float, int]
+
+        Args:
+            filename (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        with open(filename, 'r') as file:
+            lines = file.readlines()
+        
+        # Parse the header
+        header_ended = False
+        points = []
+        ids = []
+        for line in lines:
+            if header_ended:
+                # Parse the point data
+                parts = line.strip().split()
+                x, y, z = map(float, parts[:3])
+                index = int(parts[3])
+                points.append([x, y, z])
+                ids.append(index)
+            elif line.strip() == 'end_header':
+                header_ended = True
+        
+        # Convert to numpy arrays
+        points = np.array(points)
+        ids = np.array(ids)
+        return points, ids
+    
     def get_lidar(self, idx):
         lidar_file = self.root_split_path / 'velodyne' / ('%s.ply' % idx)
         assert lidar_file.exists()
         pcd = o3d.io.read_point_cloud(str(lidar_file))
         pcd = np.asarray(pcd.points)
+        # pcd, ids = self.read_ply(lidar_file)
         return np.hstack([pcd, np.zeros((pcd.shape[0], 1))])
     
     def get_lidar_stacked(self, idx, calib):
-        unity_environment_change_idx = {'data_homebuilding3_traj1': [0, 335], 'data_homebuilding2_traj1': [336, 848], 'data_homebuilding1_traj2': [849, 1507], 'data_homebuilding3_traj2': [1508, 1826], 'data_homebuilding1_traj3': [1827, 2216], 'data_homebuilding2_traj2': [2217, 2826], 'data_homebuilding1_traj1': [2827, 3614]}
+        # unity_environment_change_idx = {'data_homebuilding3_traj1': [0, 335], 'data_homebuilding2_traj1': [336, 848], 'data_homebuilding1_traj2': [849, 1507], 'data_homebuilding3_traj2': [1508, 1826], 'data_homebuilding1_traj3': [1827, 2216], 'data_homebuilding2_traj2': [2217, 2826], 'data_homebuilding1_traj1': [2827, 3614]}
+        unity_environment_change_idx = {'data_homebuilding3_traj1': [0, 460]}
         # find min and max index allowed
         # print('ye kya hai: ', int(idx))
         for env in unity_environment_change_idx:
@@ -86,10 +120,10 @@ class KittiDataset(DatasetTemplate):
                 max_idx_allowed = unity_environment_change_idx[env][1]
                 # print(min_idx_allowed, max_idx_allowed)
                 break
-        meshes = []
+        pcd_stacked = []
         curr_idx = int(idx)
         # print('og: ', curr_idx)
-        for i in range(-9, 1, 1):
+        for i in range(-29, 1, 1):
             index = curr_idx + i
             # print(index)
             if index < min_idx_allowed:
@@ -108,11 +142,13 @@ class KittiDataset(DatasetTemplate):
             pcd = o3d.io.read_point_cloud(str(lidar_file))
             pcd = np.asarray(pcd.points)
             
-            if len(meshes) == 0:
-                meshes = copy.deepcopy(pcd)
+            # pcd, ids = self.read_ply(lidar_file)
+            
+            if len(pcd_stacked) == 0:
+                pcd_stacked = copy.deepcopy(pcd)
             else:
-                meshes = np.concatenate([meshes, pcd], axis=0)
-            # print('curr idx: ', i, index, meshes.shape)
+                pcd_stacked = np.concatenate([pcd_stacked, pcd], axis=0)
+
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(meshes)
         
@@ -600,7 +636,7 @@ if __name__ == '__main__':
                          'cabinet', 
                          'desk', 
                          'bed', 
-                         'coffee table', 
+                        #  'coffee table', 
                          'bench', 
                          'refridgerator'],
             data_path=ROOT_DIR / 'data' / 'custom_data_v4',

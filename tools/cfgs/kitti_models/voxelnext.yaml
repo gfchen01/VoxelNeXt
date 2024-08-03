@@ -1,4 +1,4 @@
-CLASS_NAMES: ["chair", "sofa", "lamp", "table", "cabinet", "desk", "bed", "coffee table", "bench", "refridgerator"]
+CLASS_NAMES: ["chair", "sofa", "lamp", "table", "cabinet", "desk", "bed", "bench", "refridgerator"]
 
 DATA_CONFIG:
     _BASE_CONFIG_: cfgs/dataset_configs/kitti_dataset.yaml
@@ -11,11 +11,11 @@ DATA_CONFIG:
               DB_INFO_PATH:
                   - kitti_dbinfos_train.pkl
               PREPARE: {
-                 filter_by_min_points: ["chair:30", "sofa:30", "lamp:30", "table:30", "cabinet:30", "desk:30", "bed:30", "coffee table:30", "bench:30", "refridgerator:30"],
+                 filter_by_min_points: ["chair:30", "sofa:30", "lamp:30", "table:30", "cabinet:30", "desk:30", "bed:30", "bench:30", "refridgerator:30"],
                  filter_by_difficulty: [],
               }
 
-              SAMPLE_GROUPS: ["chair:15", "sofa:15", "lamp:15", "table:15", "cabinet:15", "desk:15", "bed:15", "coffee table:15", "bench:15", "refridgerator:15"]
+              SAMPLE_GROUPS: ["chair:15", "sofa:15", "lamp:15", "table:15", "cabinet:15", "desk:15", "bed:15", "bench:15", "refridgerator:15"]
               NUM_POINT_FEATURES: 4
               DATABASE_WITH_FAKELIDAR: False
               REMOVE_EXTRA_WIDTH: [0.0, 0.0, 0.0]
@@ -45,7 +45,7 @@ MODEL:
         INPUT_FEATURES: 128
 
         CLASS_NAMES_EACH_HEAD: [
-            ["chair", "sofa", "lamp", "table", "cabinet", "desk", "bed", "coffee table", "bench", "refridgerator"],
+            ["chair", "sofa", "lamp", "table", "cabinet", "desk", "bed", "bench", "refridgerator"],
         ]
         
         SHARED_CONV_CHANNEL: 128
@@ -77,7 +77,7 @@ MODEL:
 
         POST_PROCESSING:
             SCORE_THRESH: 0.1
-            POST_CENTER_LIMIT_RANGE: [-34.8187, -32.6075, -0.974, 30.4048, 30.8555, 6.49894]
+            POST_CENTER_LIMIT_RANGE: [-18.2747, -18.8046, -0.758832, 19.2798, 17.7043, 3.55786]
             MAX_OBJ_PER_SAMPLE: 500
             NMS_CONFIG:
                 NMS_TYPE: nms_gpu
@@ -93,8 +93,8 @@ MODEL:
 
 
 OPTIMIZATION:
-    BATCH_SIZE_PER_GPU: 32
-    NUM_EPOCHS: 80
+    BATCH_SIZE_PER_GPU: 4
+    NUM_EPOCHS: 160
 
     OPTIMIZER: adam_onecycle
     LR: 0.01

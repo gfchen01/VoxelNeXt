@@ -1,7 +1,7 @@
 DATASET: 'KittiDataset'
 DATA_PATH: '../data/custom_data_v4'
 
-POINT_CLOUD_RANGE: [-34.8187, -32.6075, -0.974, 30.4048, 30.8555, 6.49894]
+POINT_CLOUD_RANGE: [-18.2747, -18.8046, -0.758832, 19.2798, 17.7043, 3.55786]
 
 DATA_SPLIT: {
     'train': train,
@@ -24,11 +24,11 @@ DATA_AUGMENTOR:
           DB_INFO_PATH:
               - kitti_dbinfos_train.pkl
           PREPARE: {
-             filter_by_min_points: ["chair:30", "sofa:30", "lamp:30", "table:30", "cabinet:30", "desk:30", "bed:30", "coffee table:30", "bench:30", "refridgerator:30"],
+             filter_by_min_points: ["chair:30", "sofa:30", "lamp:30", "table:30", "cabinet:30", "desk:30", "bed:30", "bench:30", "refridgerator:30"],
              filter_by_difficulty: [],
           }
 
-          SAMPLE_GROUPS: ["chair:30", "sofa:30", "lamp:30", "table:30", "cabinet:30", "desk:30", "bed:30", "coffee table:30", "bench:30", "refridgerator:30"]
+          SAMPLE_GROUPS: ["chair:30", "sofa:30", "lamp:30", "table:30", "cabinet:30", "desk:30", "bed:30", "bench:30", "refridgerator:30"]
           NUM_POINT_FEATURES: 4
           DATABASE_WITH_FAKELIDAR: False
           REMOVE_EXTRA_WIDTH: [0.0, 0.0, 0.0]

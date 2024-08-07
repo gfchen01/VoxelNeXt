@@ -112,17 +112,52 @@ def main():
 
     with torch.no_grad():
         for idx, data_dict in enumerate(demo_dataset):
+            
+            obj_datadict_list = []
+            obj_pred_dict_list = []
+            for i in range(len(data_dict['points'])): # number of different objects
+                temp_dict = {'gt_names': data_dict['gt_names'][i:i+1], 'gt_boxes': data_dict['gt_boxes'][i:i+1], 'points': data_dict['points'][i]}
+                temp_dict['calib'] = data_dict['calib']
+                temp_dict['frame_id'] = data_dict['frame_id']
+                temp_dict['image_shape'] = data_dict['image_shape']
+                temp_dict = demo_dataset.prepare_data(data_dict=temp_dict)
+                obj_datadict_list.append(temp_dict)
+            
             logger.info(f'Visualized sample index: \t{idx + 1}')
-            data_dict = demo_dataset.collate_batch([data_dict])
-            load_data_to_gpu(data_dict)
-            pred_dicts, _ = model.forward(data_dict)
+            for obj_data_dict in obj_datadict_list:
+                obj_data_dict = demo_dataset.collate_batch([obj_data_dict])
+                load_data_to_gpu(obj_data_dict)
+                pred_dicts, _ = model.forward(obj_data_dict)
+                obj_pred_dict_list.append(pred_dicts[0])
+            
+            # combine predicted and original data
+            combined_data_dict = {'gt_boxes': [], 'points': []}
+            for i in range(len(obj_datadict_list)):
+                # combined_data_dict['gt_names'].append(obj_datadict_list[i]['gt_names'][0])
+                combined_data_dict['gt_boxes'].append(obj_datadict_list[i]['gt_boxes'][0])
+                combined_data_dict['points'].append(obj_datadict_list[i]['points'])
+            
+            combined_data_dict['gt_boxes'] = np.array(combined_data_dict['gt_boxes'])
+            combined_data_dict['calib'] = obj_datadict_list[0]['calib']
+            combined_data_dict['frame_id'] = obj_datadict_list[0]['frame_id']
+            combined_data_dict['image_shape'] = obj_datadict_list[0]['image_shape']
+            
+            combined_data_dict['points'] = np.concatenate(combined_data_dict['points'], axis=0)
+            # combined_data_dict = demo_dataset.prepare_data(data_dict=combined_data_dict)
+            
+            combined_pred_dict = {'pred_boxes': [], 'pred_scores': [], 'pred_labels': []}
+            for i in range(len(obj_pred_dict_list)):
+                combined_pred_dict['pred_boxes'].append(obj_pred_dict_list[i]['pred_boxes'][:1])
+                combined_pred_dict['pred_scores'].append(obj_pred_dict_list[i]['pred_scores'][:1])
+                combined_pred_dict['pred_labels'].append(obj_pred_dict_list[i]['pred_labels'][:1])
+            combined_pred_dict['pred_boxes'] = torch.concatenate(combined_pred_dict['pred_boxes'], axis=0)
             
             V.draw_scenes(
-                points=data_dict['points'][:, 1:], 
-                gt_boxes=data_dict['gt_boxes'][0], 
-                ref_boxes=pred_dicts[0]['pred_boxes'][:8],
-                ref_scores=pred_dicts[0]['pred_scores'][:8], 
-                ref_labels=pred_dicts[0]['pred_labels'][:8]
+                points=combined_data_dict['points'][:, :3], 
+                gt_boxes=combined_data_dict['gt_boxes'], 
+                ref_boxes=combined_pred_dict['pred_boxes'],
+                ref_scores=combined_pred_dict['pred_scores'], 
+                # ref_labels=combined_pred_dict['pred_labels']
             )
 
             if not OPEN3D_FLAG:

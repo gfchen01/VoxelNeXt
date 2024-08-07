@@ -381,8 +381,8 @@ def decode_bbox_from_voxels_nuscenes(batch_size, indices, obj, rot_cos, rot_sin,
         iou = torch.clamp(iou, min=0, max=1.)
 
     final_box_preds = torch.cat((box_part_list), dim=-1)
-    final_scores = scores.view(batch_size, K)
-    final_class_ids = class_ids.view(batch_size, K)
+    final_scores = scores.view(batch_size, K) if K < scores.shape[-1] else scores.view(batch_size, -1)
+    final_class_ids = class_ids.view(batch_size, K) if K < class_ids.shape[-1] else class_ids.view(batch_size, -1)
     if not add_features is None:
         add_features = [add_feature.view(batch_size, K, add_feature.shape[-1]) for add_feature in add_features]
 

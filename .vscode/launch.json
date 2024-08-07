@@ -1,0 +1,22 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger: Current File with Arguments",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "/home/luke/NREC/obj_detection/VoxelNeXt/tools",
+            "args": [
+                "--cfg_file", "cfgs/kitti_models/voxelnext.yaml",
+                // "--extra_tag", "single_obj",
+                "--ckpt", "../output/kitti_models/voxelnext/single_obj_v2/ckpt/checkpoint_epoch_400.pth",
+                "--data_path", "../data/custom_data_v4",
+            ]
+        }
+    ]
+}

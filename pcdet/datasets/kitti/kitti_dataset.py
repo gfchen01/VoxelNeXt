@@ -103,14 +103,14 @@ class KittiDataset(DatasetTemplate):
     def get_lidar(self, idx):
         lidar_file = self.root_split_path / 'velodyne' / ('%s.ply' % idx)
         assert lidar_file.exists()
-        pcd = o3d.io.read_point_cloud(str(lidar_file))
-        pcd = np.asarray(pcd.points)
-        # pcd, ids = self.read_ply(lidar_file)
+        # pcd = o3d.io.read_point_cloud(str(lidar_file))
+        # pcd = np.asarray(pcd.points)
+        pcd, ids = self.read_ply(lidar_file)
         return np.hstack([pcd, np.zeros((pcd.shape[0], 1))])
     
     def get_lidar_stacked(self, idx, calib):
         # unity_environment_change_idx = {'data_homebuilding3_traj1': [0, 335], 'data_homebuilding2_traj1': [336, 848], 'data_homebuilding1_traj2': [849, 1507], 'data_homebuilding3_traj2': [1508, 1826], 'data_homebuilding1_traj3': [1827, 2216], 'data_homebuilding2_traj2': [2217, 2826], 'data_homebuilding1_traj1': [2827, 3614]}
-        unity_environment_change_idx = {'data_homebuilding3_traj1': [0, 460]}
+        unity_environment_change_idx = {'data_homebuild1_v3': [0, 324]}
         # find min and max index allowed
         # print('ye kya hai: ', int(idx))
         for env in unity_environment_change_idx:
@@ -121,9 +121,10 @@ class KittiDataset(DatasetTemplate):
                 # print(min_idx_allowed, max_idx_allowed)
                 break
         pcd_stacked = []
+        ids_stacked = []
         curr_idx = int(idx)
         # print('og: ', curr_idx)
-        for i in range(-29, 1, 1):
+        for i in range(-9, 1, 1):
             index = curr_idx + i
             # print(index)
             if index < min_idx_allowed:
@@ -139,24 +140,26 @@ class KittiDataset(DatasetTemplate):
             except:
                 print('can\'t find this file: ', index)
                 
-            pcd = o3d.io.read_point_cloud(str(lidar_file))
-            pcd = np.asarray(pcd.points)
+            # pcd = o3d.io.read_point_cloud(str(lidar_file))
+            # pcd = np.asarray(pcd.points)
             
-            # pcd, ids = self.read_ply(lidar_file)
+            pcd, ids = self.read_ply(lidar_file)
             
             if len(pcd_stacked) == 0:
                 pcd_stacked = copy.deepcopy(pcd)
+                ids_stacked = copy.deepcopy(ids)
             else:
                 pcd_stacked = np.concatenate([pcd_stacked, pcd], axis=0)
+                ids_stacked = np.concatenate([ids_stacked, ids], axis=0)
 
         pcd = o3d.geometry.PointCloud()
-        pcd.points = o3d.utility.Vector3dVector(meshes)
+        pcd.points = o3d.utility.Vector3dVector(pcd_stacked)
         
         transformed_point_cloud = pcd.transform(calib.W2V)
         
         mesh = np.asarray(transformed_point_cloud.points)
         
-        return np.hstack([mesh, np.zeros((mesh.shape[0], 1))])
+        return np.hstack([mesh, np.zeros((mesh.shape[0], 1))]), ids_stacked
 
     def get_image(self, idx):
         """
@@ -490,6 +493,47 @@ class KittiDataset(DatasetTemplate):
             print("No bbox found.....issue:   ", sample_idx)
             exit()
         return bounding_boxes[mask_based_on_counts], gt_names[mask_based_on_counts]
+    
+    def filter_bbox_based_on_count_and_select_pc(self, point_cloud, bounding_boxes, gt_names, unity_ids, point_ids, sample_idx, min_num_points=100):
+        boxes_lidar = box_utils.boxes_to_corners_3d(bounding_boxes)
+        boxes_lidar = np.transpose(boxes_lidar, (0, 2, 1))
+
+        counts = np.zeros(len(boxes_lidar), dtype=int)
+
+        # print('boxes_lidar: ', boxes_lidar.shape)
+        # print('gt names: ', gt_names.shape)
+        # print('point cloud: ', point_cloud)
+        for i, box in enumerate(boxes_lidar):
+            # print(gt_names.shape, box)
+            xmin, ymin, zmin, xmax, ymax, zmax = np.min(box[0]), np.min(box[1]), np.min(box[2]), np.max(box[0]), np.max(box[1]), np.max(box[2])
+            # print(gt_names.shape, xmin, ymin, zmin, xmax, ymax, zmax)
+            # Logical check for each dimension
+            within_x = (point_cloud[:, 0] >= xmin) & (point_cloud[:, 0] <= xmax)
+            within_y = (point_cloud[:, 1] >= ymin) & (point_cloud[:, 1] <= ymax)
+            within_z = (point_cloud[:, 2] >= zmin) & (point_cloud[:, 2] <= zmax)
+            
+            # Combine all dimensions
+            within_box = within_x & within_y & within_z
+            
+            # Count points within the current bounding box
+            counts[i] = np.sum(within_box)
+            # print('count: ', i, counts[i])
+        
+        mask_based_on_counts = counts > min_num_points
+        filtered_ids = unity_ids[mask_based_on_counts]
+        
+        object_pointcloud = []
+        for instance_id in filtered_ids:
+            object_pointcloud.append(point_cloud[point_ids == instance_id])
+            
+        # object_pointcloud.append(point_cloud[point_ids == -2090])
+        
+        # print('mask based on counts: ', mask_based_on_counts)
+        # print('counts: ', counts)
+        if True not in mask_based_on_counts:
+            print("No bbox found.....issue:   ", sample_idx)
+            exit()
+        return bounding_boxes[mask_based_on_counts], gt_names[mask_based_on_counts], filtered_ids, object_pointcloud
 
     def __len__(self):
         if self._merge_all_iters_to_one_epoch:
@@ -498,7 +542,6 @@ class KittiDataset(DatasetTemplate):
         return len(self.kitti_infos)
 
     def __getitem__(self, index):
-        # index = 909
         if self._merge_all_iters_to_one_epoch:
             index = index % len(self.kitti_infos)
 
@@ -517,11 +560,7 @@ class KittiDataset(DatasetTemplate):
         # print(input_dict['frame_id'])
 
         if "points" in get_item_list:
-            points = self.get_lidar_stacked(sample_idx, calib)
-            # if self.dataset_cfg.FOV_POINTS_ONLY:
-            #     pts_rect = calib.lidar_to_rect(points[:, 0:3])
-            #     fov_flag = self.get_fov_flag(pts_rect, img_shape, calib)
-            #     points = points[fov_flag]
+            points, point_ids = self.get_lidar_stacked(sample_idx, calib)
             input_dict['points'] = points
             
         if 'annos' in info:
@@ -533,12 +572,15 @@ class KittiDataset(DatasetTemplate):
             annotations['dimensions'] = np.array([[obj.l, obj.h, obj.w] for obj in obj_list])  # lhw(camera) format
             annotations['location'] = np.concatenate([obj.loc.reshape(1, 3) for obj in obj_list], axis=0)
             annotations['rotation_y'] = np.array([obj.ry for obj in obj_list])
+            annotations['id'] = np.array([obj.id for obj in obj_list])
 
             num_objects = len([obj.cls_type for obj in obj_list if obj.cls_type != 'DontCare'])
-                
+            
+            ## BUG FIX: DontCare may not be at the bottom in custom dataset
             loc = annotations['location'][:num_objects]
             dims = annotations['dimensions'][:num_objects]
             rots = annotations['rotation_y'][:num_objects]
+            unity_ids = annotations['id'][:num_objects]
             # loc, dims, rots = annos['location'], annos['dimensions'], annos['rotation_y']
             gt_names = annos['name']
             # gt_boxes_camera = np.concatenate([loc, dims, rots[..., np.newaxis]], axis=1).astype(np.float32)
@@ -550,8 +592,23 @@ class KittiDataset(DatasetTemplate):
             rots = rots.reshape(-1,1)
             gt_boxes_lidar = np.concatenate([loc_lidar, l, w, h, rots], axis=1)
             
-            gt_boxes_lidar, gt_names = self.filter_bbox_based_on_count(input_dict['points'], gt_boxes_lidar, gt_names, sample_idx) # place this somewhere up coz you have to fler all bbox properties
-                
+            # gt_boxes_lidar, gt_names = self.filter_bbox_based_on_count(input_dict['points'], gt_boxes_lidar, gt_names, sample_idx) # place this somewhere up coz you have to fler all bbox properties
+            gt_boxes_lidar, gt_names, unity_ids, object_pointcloud = self.filter_bbox_based_on_count_and_select_pc(input_dict['points'], gt_boxes_lidar, gt_names, unity_ids, point_ids, sample_idx) # place this somewhere up coz you have to fler all bbox properties
+            
+            # randomly sample 1 object
+            if self.training:
+                num_objects = len(gt_boxes_lidar)
+                if num_objects > 1:
+                    idx = np.random.randint(num_objects)
+                    gt_boxes_lidar = gt_boxes_lidar[idx:idx+1]
+                    gt_names = gt_names[idx:idx+1]
+                    # object_pointcloud = object_pointcloud[idx:idx+1]
+                    unity_ids = unity_ids[idx:idx+1]
+                    
+                    input_dict['points'] = object_pointcloud[idx]
+            else:
+                input_dict['points'] = object_pointcloud
+            
             input_dict.update({
                 'gt_names': gt_names,
                 'gt_boxes': gt_boxes_lidar
@@ -573,7 +630,11 @@ class KittiDataset(DatasetTemplate):
             input_dict["trans_lidar_to_cam"], input_dict["trans_cam_to_img"] = kitti_utils.calib_to_matricies(calib)
 
         input_dict['calib'] = calib
-        data_dict = self.prepare_data(data_dict=input_dict)
+        
+        if self.training:
+            data_dict = self.prepare_data(data_dict=input_dict)
+        else: # Just for demo.py
+            data_dict = input_dict
 
         data_dict['image_shape'] = img_shape
         return data_dict
@@ -591,13 +652,13 @@ def create_kitti_infos(dataset_cfg, class_names, data_path, save_path, workers=4
     print('---------------Start to generate data infos---------------')
 
     dataset.set_split(train_split)
-    kitti_infos_train = dataset.get_infos(num_workers=workers, has_label=True, count_inside_pts=True)
+    kitti_infos_train = dataset.get_infos(num_workers=workers, has_label=True, count_inside_pts=False)
     with open(train_filename, 'wb') as f:
         pickle.dump(kitti_infos_train, f)
     print('Kitti info train file is saved to %s' % train_filename)
 
     dataset.set_split(val_split)
-    kitti_infos_val = dataset.get_infos(num_workers=workers, has_label=True, count_inside_pts=True)
+    kitti_infos_val = dataset.get_infos(num_workers=workers, has_label=True, count_inside_pts=False)
     with open(val_filename, 'wb') as f:
         pickle.dump(kitti_infos_val, f)
     print('Kitti info val file is saved to %s' % val_filename)

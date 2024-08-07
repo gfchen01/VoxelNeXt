@@ -1,4 +1,4 @@
-CLASS_NAMES: ["chair", "sofa", "lamp", "table", "cabinet", "desk", "bed", "bench", "refridgerator"]
+CLASS_NAMES: ["chair", "sofa", "lamp", "table", "cabinet", "desk", "bench", "bed", "refridgerator"]
 
 DATA_CONFIG:
     _BASE_CONFIG_: cfgs/dataset_configs/kitti_dataset.yaml
@@ -64,7 +64,7 @@ MODEL:
 
         TARGET_ASSIGNER_CONFIG:
             FEATURE_MAP_STRIDE: 8
-            NUM_MAX_OBJS: 500
+            NUM_MAX_OBJS: 10
             GAUSSIAN_OVERLAP: 0.1
             MIN_RADIUS: 2
 
@@ -78,7 +78,7 @@ MODEL:
         POST_PROCESSING:
             SCORE_THRESH: 0.1
             POST_CENTER_LIMIT_RANGE: [-18.2747, -18.8046, -0.758832, 19.2798, 17.7043, 3.55786]
-            MAX_OBJ_PER_SAMPLE: 500
+            MAX_OBJ_PER_SAMPLE: 10
             NMS_CONFIG:
                 NMS_TYPE: nms_gpu
                 NMS_THRESH: 0.1
@@ -94,7 +94,7 @@ MODEL:
 
 OPTIMIZATION:
     BATCH_SIZE_PER_GPU: 4
-    NUM_EPOCHS: 160
+    NUM_EPOCHS: 960
 
     OPTIMIZER: adam_onecycle
     LR: 0.01

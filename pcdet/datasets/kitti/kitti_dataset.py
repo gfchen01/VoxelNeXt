@@ -108,7 +108,7 @@ class KittiDataset(DatasetTemplate):
         pcd, ids = self.read_ply(lidar_file)
         return np.hstack([pcd, np.zeros((pcd.shape[0], 1))])
     
-    def get_lidar_stacked(self, idx, calib):
+    def get_lidar_stacked(self, idx, calib, stack_num=1):
         # unity_environment_change_idx = {'data_homebuilding3_traj1': [0, 335], 'data_homebuilding2_traj1': [336, 848], 'data_homebuilding1_traj2': [849, 1507], 'data_homebuilding3_traj2': [1508, 1826], 'data_homebuilding1_traj3': [1827, 2216], 'data_homebuilding2_traj2': [2217, 2826], 'data_homebuilding1_traj1': [2827, 3614]}
         unity_environment_change_idx = {'data_homebuild1_v3': [0, 324]}
         # find min and max index allowed
@@ -124,7 +124,7 @@ class KittiDataset(DatasetTemplate):
         ids_stacked = []
         curr_idx = int(idx)
         # print('og: ', curr_idx)
-        for i in range(-9, 1, 1):
+        for i in range(1-stack_num, 1, 1):
             index = curr_idx + i
             # print(index)
             if index < min_idx_allowed:
@@ -560,7 +560,7 @@ class KittiDataset(DatasetTemplate):
         # print(input_dict['frame_id'])
 
         if "points" in get_item_list:
-            points, point_ids = self.get_lidar_stacked(sample_idx, calib)
+            points, point_ids = self.get_lidar_stacked(sample_idx, calib, stack_num=1)
             input_dict['points'] = points
             
         if 'annos' in info:

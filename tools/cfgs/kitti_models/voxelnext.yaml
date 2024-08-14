@@ -6,20 +6,20 @@ DATA_CONFIG:
     DATA_AUGMENTOR:
         DISABLE_AUG_LIST: ['placeholder']
         AUG_CONFIG_LIST:
-            - NAME: gt_sampling
-              USE_ROAD_PLANE: True
-              DB_INFO_PATH:
-                  - kitti_dbinfos_train.pkl
-              PREPARE: {
-                 filter_by_min_points: ["chair:30", "sofa:30", "lamp:30", "table:30", "cabinet:30", "desk:30", "bed:30", "bench:30", "refridgerator:30"],
-                 filter_by_difficulty: [],
-              }
+            # - NAME: gt_sampling
+            #   USE_ROAD_PLANE: True
+            #   DB_INFO_PATH:
+            #       - kitti_dbinfos_train.pkl
+            #   PREPARE: {
+            #      filter_by_min_points: ["chair:30", "sofa:30", "lamp:30", "table:30", "cabinet:30", "desk:30", "bed:30", "bench:30", "refridgerator:30"],
+            #      filter_by_difficulty: [],
+            #   }
 
-              SAMPLE_GROUPS: ["chair:15", "sofa:15", "lamp:15", "table:15", "cabinet:15", "desk:15", "bed:15", "bench:15", "refridgerator:15"]
-              NUM_POINT_FEATURES: 4
-              DATABASE_WITH_FAKELIDAR: False
-              REMOVE_EXTRA_WIDTH: [0.0, 0.0, 0.0]
-              LIMIT_WHOLE_SCENE: False
+            #   SAMPLE_GROUPS: ["chair:15", "sofa:15", "lamp:15", "table:15", "cabinet:15", "desk:15", "bed:15", "bench:15", "refridgerator:15"]
+            #   NUM_POINT_FEATURES: 4
+            #   DATABASE_WITH_FAKELIDAR: False
+            #   REMOVE_EXTRA_WIDTH: [0.0, 0.0, 0.0]
+            #   LIMIT_WHOLE_SCENE: False
 
             - NAME: random_world_flip
               ALONG_AXIS_LIST: ['x']
@@ -77,7 +77,7 @@ MODEL:
 
         POST_PROCESSING:
             SCORE_THRESH: 0.1
-            POST_CENTER_LIMIT_RANGE: [-26.186725347025536, -26.115696150879813, -0.7589571950957179, 20.076869764998463, 21.032480415283427, 4.105504989624023]
+            POST_CENTER_LIMIT_RANGE: [-27.401013300461674, -26.225578633232722, -0.7589571960270405, 27.215453945759858, 27.096006649192805, 3.6982860565185547]
             MAX_OBJ_PER_SAMPLE: 10
             NMS_CONFIG:
                 NMS_TYPE: nms_gpu
@@ -93,8 +93,8 @@ MODEL:
 
 
 OPTIMIZATION:
-    BATCH_SIZE_PER_GPU: 4
-    NUM_EPOCHS: 960
+    BATCH_SIZE_PER_GPU: 64
+    NUM_EPOCHS: 1000
 
     OPTIMIZER: adam_onecycle
     LR: 0.01

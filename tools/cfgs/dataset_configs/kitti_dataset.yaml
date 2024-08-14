@@ -1,7 +1,7 @@
 DATASET: 'KittiDataset'
 DATA_PATH: '../data/custom_data_v4'
 
-POINT_CLOUD_RANGE: [-26.186725347025536, -26.115696150879813, -0.7589571950957179, 20.076869764998463, 21.032480415283427, 4.105504989624023]
+POINT_CLOUD_RANGE: [-27.401013300461674, -26.225578633232722, -0.7589571960270405, 27.215453945759858, 27.096006649192805, 3.6982860565185547]
 
 DATA_SPLIT: {
     'train': train,
@@ -19,20 +19,20 @@ FOV_POINTS_ONLY: True
 DATA_AUGMENTOR:
     DISABLE_AUG_LIST: ['placeholder']
     AUG_CONFIG_LIST:
-        - NAME: gt_sampling
-          USE_ROAD_PLANE: True
-          DB_INFO_PATH:
-              - kitti_dbinfos_train.pkl
-          PREPARE: {
-             filter_by_min_points: ["chair:30", "sofa:30", "lamp:30", "table:30", "cabinet:30", "desk:30", "bed:30", "bench:30", "refridgerator:30"],
-             filter_by_difficulty: [],
-          }
+        # - NAME: gt_sampling
+        #   USE_ROAD_PLANE: True
+        #   DB_INFO_PATH:
+        #       - kitti_dbinfos_train.pkl
+        #   PREPARE: {
+        #      filter_by_min_points: ["chair:30", "sofa:30", "lamp:30", "table:30", "cabinet:30", "desk:30", "bed:30", "bench:30", "refridgerator:30"],
+        #      filter_by_difficulty: [],
+        #   }
 
-          SAMPLE_GROUPS: ["chair:30", "sofa:30", "lamp:30", "table:30", "cabinet:30", "desk:30", "bed:30", "bench:30", "refridgerator:30"]
-          NUM_POINT_FEATURES: 4
-          DATABASE_WITH_FAKELIDAR: False
-          REMOVE_EXTRA_WIDTH: [0.0, 0.0, 0.0]
-          LIMIT_WHOLE_SCENE: True
+        #   SAMPLE_GROUPS: ["chair:30", "sofa:30", "lamp:30", "table:30", "cabinet:30", "desk:30", "bed:30", "bench:30", "refridgerator:30"]
+        #   NUM_POINT_FEATURES: 4
+        #   DATABASE_WITH_FAKELIDAR: False
+        #   REMOVE_EXTRA_WIDTH: [0.0, 0.0, 0.0]
+        #   LIMIT_WHOLE_SCENE: True
 
         - NAME: random_world_flip
           ALONG_AXIS_LIST: ['x']
@@ -62,7 +62,7 @@ DATA_PROCESSOR:
       }
 
     - NAME: transform_points_to_voxels
-      VOXEL_SIZE: [0.092, 0.9, 0.14]
+      VOXEL_SIZE: [0.05, 0.05, 0.1]
       MAX_POINTS_PER_VOXEL: 5
       MAX_NUMBER_OF_VOXELS: {
         'train': 16000,

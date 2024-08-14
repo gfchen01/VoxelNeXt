@@ -121,7 +121,12 @@ def main():
                 temp_dict['frame_id'] = data_dict['frame_id']
                 temp_dict['image_shape'] = data_dict['image_shape']
                 temp_dict = demo_dataset.prepare_data(data_dict=temp_dict)
+                if temp_dict['gt_boxes'].shape[0] == 0:
+                    continue
                 obj_datadict_list.append(temp_dict)
+            
+            if obj_datadict_list == []:
+                continue
             
             logger.info(f'Visualized sample index: \t{idx + 1}')
             for obj_data_dict in obj_datadict_list:

@@ -4,12 +4,12 @@ import pickle
 import numpy as np
 from skimage import io
 import open3d as o3d
+import pandas as pd
 
 from . import kitti_utils
 from ...ops.roiaware_pool3d import roiaware_pool3d_utils
 from ...utils import box_utils, calibration_kitti, common_utils, object3d_kitti
 from ..dataset import DatasetTemplate
-
 
 class KittiDataset(DatasetTemplate):
     def __init__(self, dataset_cfg, class_names, training=True, root_path=None, logger=None):
@@ -77,40 +77,18 @@ class KittiDataset(DatasetTemplate):
         Returns:
             _type_: _description_
         """
-        with open(filename, 'r') as file:
-            lines = file.readlines()
-        
-        # Parse the header
-        header_ended = False
-        points = []
-        ids = []
-        for line in lines:
-            if header_ended:
-                # Parse the point data
-                parts = line.strip().split()
-                x, y, z = map(float, parts[:3])
-                index = int(parts[3])
-                points.append([x, y, z])
-                ids.append(index)
-            elif line.strip() == 'end_header':
-                header_ended = True
-        
-        # Convert to numpy arrays
-        points = np.array(points)
-        ids = np.array(ids)
-        return points, ids
+        pcd = o3d.io.read_point_cloud(str(filename))
+        return np.asarray(pcd.points)
     
     def get_lidar(self, idx):
         lidar_file = self.root_split_path / 'velodyne' / ('%s.ply' % idx)
         assert lidar_file.exists()
-        # pcd = o3d.io.read_point_cloud(str(lidar_file))
-        # pcd = np.asarray(pcd.points)
-        pcd, ids = self.read_ply(lidar_file)
+        pcd = self.read_ply(lidar_file)
         return np.hstack([pcd, np.zeros((pcd.shape[0], 1))])
     
     def get_lidar_stacked(self, idx, calib, stack_num=1):
         # unity_environment_change_idx = {'data_homebuilding3_traj1': [0, 335], 'data_homebuilding2_traj1': [336, 848], 'data_homebuilding1_traj2': [849, 1507], 'data_homebuilding3_traj2': [1508, 1826], 'data_homebuilding1_traj3': [1827, 2216], 'data_homebuilding2_traj2': [2217, 2826], 'data_homebuilding1_traj1': [2827, 3614]}
-        unity_environment_change_idx = {'data_homebuild1_v3': [0, 324]}
+        unity_environment_change_idx = {'data_homebuild1_v4': [0, 451]}
         # find min and max index allowed
         # print('ye kya hai: ', int(idx))
         for env in unity_environment_change_idx:
@@ -139,27 +117,15 @@ class KittiDataset(DatasetTemplate):
                 assert lidar_file.exists()
             except:
                 print('can\'t find this file: ', index)
-                
-            # pcd = o3d.io.read_point_cloud(str(lidar_file))
-            # pcd = np.asarray(pcd.points)
-            
-            pcd, ids = self.read_ply(lidar_file)
-            
-            if len(pcd_stacked) == 0:
-                pcd_stacked = copy.deepcopy(pcd)
-                ids_stacked = copy.deepcopy(ids)
-            else:
-                pcd_stacked = np.concatenate([pcd_stacked, pcd], axis=0)
-                ids_stacked = np.concatenate([ids_stacked, ids], axis=0)
 
+            pcd_stacked.append(self.read_ply(lidar_file))
+
+        pcd_stacked = np.concatenate(pcd_stacked, axis=0)
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(pcd_stacked)
-        
         transformed_point_cloud = pcd.transform(calib.W2V)
-        
-        mesh = np.asarray(transformed_point_cloud.points)
-        
-        return np.hstack([mesh, np.zeros((mesh.shape[0], 1))]), ids_stacked
+        pcd = np.asarray(transformed_point_cloud.points)
+        return np.hstack([pcd, np.zeros((pcd.shape[0], 1))])
 
     def get_image(self, idx):
         """
@@ -491,49 +457,64 @@ class KittiDataset(DatasetTemplate):
         # print('counts: ', counts)
         if True not in mask_based_on_counts:
             print("No bbox found.....issue:   ", sample_idx)
-            exit()
+            # exit()
         return bounding_boxes[mask_based_on_counts], gt_names[mask_based_on_counts]
     
-    def filter_bbox_based_on_count_and_select_pc(self, point_cloud, bounding_boxes, gt_names, unity_ids, point_ids, sample_idx, min_num_points=100):
+    def filter_bbox_based_on_count_and_select_pc(self, point_cloud, bounding_boxes, bboxes_2d, gt_names, unity_ids, sample_idx, min_num_points=100):
+        assert(len(bounding_boxes) == len(bboxes_2d) == len(gt_names) == len(unity_ids))
+        
         boxes_lidar = box_utils.boxes_to_corners_3d(bounding_boxes)
         boxes_lidar = np.transpose(boxes_lidar, (0, 2, 1))
-
-        counts = np.zeros(len(boxes_lidar), dtype=int)
-
-        # print('boxes_lidar: ', boxes_lidar.shape)
-        # print('gt names: ', gt_names.shape)
-        # print('point cloud: ', point_cloud)
-        for i, box in enumerate(boxes_lidar):
-            # print(gt_names.shape, box)
+        
+        point_pixels_dict = kitti_utils.scan2pixels(point_cloud)
+        point_to_pixel = pd.DataFrame(point_pixels_dict)
+        
+        object_pointcloud = []
+        counts = np.zeros(len(boxes_lidar), dtype=int) # same as len(unity_ids), len(gt_names), ...
+        mask_based_on_bbox2d_area = np.ones(len(boxes_lidar), dtype=bool)
+        for i in range(unity_ids.shape[0]):
+            # ================== Project Pointcloud to find object cloud ==================
+            bbox_2d = bboxes_2d[i]
+            x1, y1, x2, y2 = bbox_2d
+            if x1 > x2:
+                x1, x2 = x2, x1
+            if y1 > y2:
+                y1, y2 = y2, y1
+            
+            if (x2 - x1) < 25 or (y2 - y1) < 25:
+                mask_based_on_bbox2d_area[i] = False
+                continue
+        
+            mask = (point_to_pixel['horiPixelID'] >= x1) & (point_to_pixel['horiPixelID'] <= x2) & (point_to_pixel['vertPixelID'] >= y1) & (point_to_pixel['vertPixelID'] <= y2)
+            obj_point_ids = point_to_pixel[mask].index
+            object_pointcloud.append(point_cloud[obj_point_ids])
+            
+            # ================== Filter the object cloud based on counts in each bounding box ==================
+            box = boxes_lidar[i]
             xmin, ymin, zmin, xmax, ymax, zmax = np.min(box[0]), np.min(box[1]), np.min(box[2]), np.max(box[0]), np.max(box[1]), np.max(box[2])
             # print(gt_names.shape, xmin, ymin, zmin, xmax, ymax, zmax)
             # Logical check for each dimension
-            within_x = (point_cloud[:, 0] >= xmin) & (point_cloud[:, 0] <= xmax)
-            within_y = (point_cloud[:, 1] >= ymin) & (point_cloud[:, 1] <= ymax)
-            within_z = (point_cloud[:, 2] >= zmin) & (point_cloud[:, 2] <= zmax)
+            within_x = (object_pointcloud[-1][:, 0] >= xmin) & (object_pointcloud[-1][:, 0] <= xmax)
+            within_y = (object_pointcloud[-1][:, 1] >= ymin) & (object_pointcloud[-1][:, 1] <= ymax)
+            within_z = (object_pointcloud[-1][:, 2] >= zmin) & (object_pointcloud[-1][:, 2] <= zmax)
             
             # Combine all dimensions
             within_box = within_x & within_y & within_z
             
             # Count points within the current bounding box
             counts[i] = np.sum(within_box)
-            # print('count: ', i, counts[i])
-        
-        mask_based_on_counts = counts > min_num_points
-        filtered_ids = unity_ids[mask_based_on_counts]
-        
-        object_pointcloud = []
-        for instance_id in filtered_ids:
-            object_pointcloud.append(point_cloud[point_ids == instance_id])
             
-        # object_pointcloud.append(point_cloud[point_ids == -2090])
+        mask_based_on_counts = counts > min_num_points
+        mask_final = mask_based_on_counts & mask_based_on_bbox2d_area
         
-        # print('mask based on counts: ', mask_based_on_counts)
-        # print('counts: ', counts)
-        if True not in mask_based_on_counts:
+        if True not in mask_final:
             print("No bbox found.....issue:   ", sample_idx)
-            exit()
-        return bounding_boxes[mask_based_on_counts], gt_names[mask_based_on_counts], filtered_ids, object_pointcloud
+            print('mask based on counts: ', mask_based_on_counts)
+            print('mask based on bbox2d area: ', mask_based_on_bbox2d_area)
+            # exit()
+        
+        filtered_object_pointcloud = [item for i, item in enumerate(object_pointcloud) if mask_final[i]]
+        return bounding_boxes[mask_final], bboxes_2d[mask_final], gt_names[mask_final], unity_ids[mask_final], filtered_object_pointcloud
 
     def __len__(self):
         if self._merge_all_iters_to_one_epoch:
@@ -542,63 +523,74 @@ class KittiDataset(DatasetTemplate):
         return len(self.kitti_infos)
 
     def __getitem__(self, index):
-        if self._merge_all_iters_to_one_epoch:
-            index = index % len(self.kitti_infos)
+        orig_index = index
+        for k in range(30):
+            index = orig_index + k
+            if self._merge_all_iters_to_one_epoch:
+                index = index % len(self.kitti_infos)
 
-        info = copy.deepcopy(self.kitti_infos[index])
+            info = copy.deepcopy(self.kitti_infos[index])
 
-        sample_idx = info['point_cloud']['lidar_idx']
+            sample_idx = info['point_cloud']['lidar_idx']
 
-        img_shape = info['image']['image_shape']
-        calib = self.get_calib(sample_idx)
-        get_item_list = self.dataset_cfg.get('GET_ITEM_LIST', ['points'])
+            img_shape = info['image']['image_shape']
+            calib = self.get_calib(sample_idx)
+            get_item_list = self.dataset_cfg.get('GET_ITEM_LIST', ['points'])
 
-        input_dict = {
-            'frame_id': sample_idx,
-            'calib': calib,
-        }
-        # print(input_dict['frame_id'])
+            input_dict = {
+                'frame_id': sample_idx,
+                'calib': calib,
+            }
+            # print(input_dict['frame_id'])
 
-        if "points" in get_item_list:
-            points, point_ids = self.get_lidar_stacked(sample_idx, calib, stack_num=1)
-            input_dict['points'] = points
-            
-        if 'annos' in info:
-            obj_list = self.get_label(sample_idx)
-            annos = info['annos']
-            annos = common_utils.drop_info_with_name(annos, name='DontCare')
-            
-            annotations = {}
-            annotations['dimensions'] = np.array([[obj.l, obj.h, obj.w] for obj in obj_list])  # lhw(camera) format
-            annotations['location'] = np.concatenate([obj.loc.reshape(1, 3) for obj in obj_list], axis=0)
-            annotations['rotation_y'] = np.array([obj.ry for obj in obj_list])
-            annotations['id'] = np.array([obj.id for obj in obj_list])
+            if "points" in get_item_list:
+                points = self.get_lidar_stacked(sample_idx, calib, stack_num=10)
+                input_dict['points'] = points
+                
+            if 'annos' in info:
+                obj_list = self.get_label(sample_idx)
+                annos = info['annos']
+                annos = common_utils.drop_info_with_name(annos, name='DontCare')
+                
+                annotations = {}
+                annotations['dimensions'] = np.array([[obj.l, obj.h, obj.w] for obj in obj_list])  # lhw(camera) format
+                annotations['location'] = np.concatenate([obj.loc.reshape(1, 3) for obj in obj_list], axis=0)
+                annotations['rotation_y'] = np.array([obj.ry for obj in obj_list])
+                annotations['id'] = np.array([obj.id for obj in obj_list])
+                annotations['bbox2d'] = np.concatenate([obj.box2d.reshape(1, 4) for obj in obj_list], axis=0)
 
-            num_objects = len([obj.cls_type for obj in obj_list if obj.cls_type != 'DontCare'])
-            
-            ## BUG FIX: DontCare may not be at the bottom in custom dataset
-            loc = annotations['location'][:num_objects]
-            dims = annotations['dimensions'][:num_objects]
-            rots = annotations['rotation_y'][:num_objects]
-            unity_ids = annotations['id'][:num_objects]
-            # loc, dims, rots = annos['location'], annos['dimensions'], annos['rotation_y']
-            gt_names = annos['name']
-            # gt_boxes_camera = np.concatenate([loc, dims, rots[..., np.newaxis]], axis=1).astype(np.float32)
-            # gt_boxes_lidar = box_utils.boxes3d_kitti_camera_to_lidar(gt_boxes_camera, calib)
-            
-            loc_lidar = calib.rect_to_lidar(loc)
-            l, h, w = dims[:, 0:1], dims[:, 1:2], dims[:, 2:3]
-            # loc_lidar[:, 2] += h[:, 0] / 2
-            rots = rots.reshape(-1,1)
-            gt_boxes_lidar = np.concatenate([loc_lidar, l, w, h, rots], axis=1)
-            
-            # gt_boxes_lidar, gt_names = self.filter_bbox_based_on_count(input_dict['points'], gt_boxes_lidar, gt_names, sample_idx) # place this somewhere up coz you have to fler all bbox properties
-            gt_boxes_lidar, gt_names, unity_ids, object_pointcloud = self.filter_bbox_based_on_count_and_select_pc(input_dict['points'], gt_boxes_lidar, gt_names, unity_ids, point_ids, sample_idx) # place this somewhere up coz you have to fler all bbox properties
-            
-            # randomly sample 1 object
-            if self.training:
-                num_objects = len(gt_boxes_lidar)
-                if num_objects > 1:
+                num_objects = len([obj.cls_type for obj in obj_list if obj.cls_type != 'DontCare'])
+                
+                ## BUG FIX: DontCare may not be at the bottom in custom dataset
+                loc = annotations['location'][:num_objects]
+                dims = annotations['dimensions'][:num_objects]
+                rots = annotations['rotation_y'][:num_objects]
+                unity_ids = annotations['id'][:num_objects]
+                # loc, dims, rots = annos['location'], annos['dimensions'], annos['rotation_y']
+                gt_names = annos['name']
+                # gt_boxes_camera = np.concatenate([loc, dims, rots[..., np.newaxis]], axis=1).astype(np.float32)
+                # gt_boxes_lidar = box_utils.boxes3d_kitti_camera_to_lidar(gt_boxes_camera, calib)
+                
+                loc_lidar = calib.rect_to_lidar(loc)
+                l, h, w = dims[:, 0:1], dims[:, 1:2], dims[:, 2:3]
+                # loc_lidar[:, 2] += h[:, 0] / 2
+                rots = rots.reshape(-1,1)
+                gt_boxes_lidar = np.concatenate([loc_lidar, l, w, h, rots], axis=1)
+                bboxes_2d = annotations['bbox2d']
+                
+                # gt_boxes_lidar, gt_names = self.filter_bbox_based_on_count(input_dict['points'], gt_boxes_lidar, gt_names, sample_idx) # place this somewhere up coz you have to fler all bbox properties
+                gt_boxes_lidar, bboxes_2d, gt_names, unity_ids, object_pointcloud = self.filter_bbox_based_on_count_and_select_pc(input_dict['points'], gt_boxes_lidar, bboxes_2d, gt_names, unity_ids, sample_idx) # place this somewhere up coz you have to fler all bbox properties
+                if len(gt_boxes_lidar) == 0:
+                    continue
+                
+                for i in range(len(object_pointcloud)):
+                    if object_pointcloud[i].shape[0] < 100:
+                        print('Not enough points in the object: ', sample_idx)
+                        gt_boxes_lidar, gt_names, unity_ids, object_pointcloud = self.filter_bbox_based_on_count_and_select_pc(input_dict['points'], gt_boxes_lidar, bboxes_2d, gt_names, unity_ids, sample_idx) # place this somewhere up coz you have to fler all bbox properties
+                
+                # randomly sample 1 object
+                if self.training:
+                    num_objects = len(gt_boxes_lidar)
                     idx = np.random.randint(num_objects)
                     gt_boxes_lidar = gt_boxes_lidar[idx:idx+1]
                     gt_names = gt_names[idx:idx+1]
@@ -606,39 +598,53 @@ class KittiDataset(DatasetTemplate):
                     unity_ids = unity_ids[idx:idx+1]
                     
                     input_dict['points'] = object_pointcloud[idx]
-            else:
-                input_dict['points'] = object_pointcloud
+                    if input_dict['points'].shape[0] < 100:
+                        print('Not enough points in the object: ', sample_idx)
+                    input_dict['id_selected'] = idx
+                else:
+                    # num_objects = len(gt_boxes_lidar)
+                    # if num_objects > 1:
+                    #     idx = 0
+                    #     gt_boxes_lidar = gt_boxes_lidar[idx:idx+1]
+                    #     gt_names = gt_names[idx:idx+1]
+                    #     # object_pointcloud = object_pointcloud[idx:idx+1]
+                    #     unity_ids = unity_ids[idx:idx+1]
+                        
+                    #     input_dict['points'] = object_pointcloud[idx:idx+1]
+                    input_dict['points'] = object_pointcloud
+                
+                input_dict.update({
+                    'gt_names': gt_names,
+                    'gt_boxes': gt_boxes_lidar
+                })
+                if "gt_boxes2d" in get_item_list:
+                    input_dict['gt_boxes2d'] = annos["bbox"]
+
+                road_plane = self.get_road_plane(sample_idx)
+                if road_plane is not None:
+                    input_dict['road_plane'] = road_plane
+
+            if "images" in get_item_list:
+                input_dict['images'] = self.get_image(sample_idx)
+
+            if "depth_maps" in get_item_list:
+                input_dict['depth_maps'] = self.get_depth_map(sample_idx)
+
+            if "calib_matricies" in get_item_list:
+                input_dict["trans_lidar_to_cam"], input_dict["trans_cam_to_img"] = kitti_utils.calib_to_matricies(calib)
+
+            input_dict['calib'] = calib
             
-            input_dict.update({
-                'gt_names': gt_names,
-                'gt_boxes': gt_boxes_lidar
-            })
-            if "gt_boxes2d" in get_item_list:
-                input_dict['gt_boxes2d'] = annos["bbox"]
+            if self.training:
+                data_dict = self.prepare_data(data_dict=input_dict)
+            else: # Just for demo.py
+                data_dict = input_dict
 
-            road_plane = self.get_road_plane(sample_idx)
-            if road_plane is not None:
-                input_dict['road_plane'] = road_plane
+            data_dict['image_shape'] = img_shape
+            return data_dict
 
-        if "images" in get_item_list:
-            input_dict['images'] = self.get_image(sample_idx)
-
-        if "depth_maps" in get_item_list:
-            input_dict['depth_maps'] = self.get_depth_map(sample_idx)
-
-        if "calib_matricies" in get_item_list:
-            input_dict["trans_lidar_to_cam"], input_dict["trans_cam_to_img"] = kitti_utils.calib_to_matricies(calib)
-
-        input_dict['calib'] = calib
-        
-        if self.training:
-            data_dict = self.prepare_data(data_dict=input_dict)
-        else: # Just for demo.py
-            data_dict = input_dict
-
-        data_dict['image_shape'] = img_shape
-        return data_dict
-
+        # Cannot find index after multiple iters
+        raise ValueError('Cannot find a valid frame index')
 
 def create_kitti_infos(dataset_cfg, class_names, data_path, save_path, workers=4):
     dataset = KittiDataset(dataset_cfg=dataset_cfg, class_names=class_names, root_path=data_path, training=False)
@@ -698,7 +704,7 @@ if __name__ == '__main__':
                          'desk', 
                          'bed', 
                         #  'coffee table', 
-                         'bench', 
+                        #  'bench', 
                          'refridgerator'],
             data_path=ROOT_DIR / 'data' / 'custom_data_v4',
             save_path=ROOT_DIR / 'data' / 'custom_data_v4'

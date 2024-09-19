@@ -454,6 +454,10 @@ class RegLossSparse(nn.Module):
             batch_inds = batch_index==bs_idx
             pred.append(output[batch_inds][ind[bs_idx]])
         pred = torch.stack(pred)
+        
+        # GUOFEI: add scale for orientation
+        target[..., 6:8] = target[..., 6:8] * 5
+        pred[..., 6:8] = pred[..., 6:8] * 5
 
         loss = _reg_loss(pred, target, mask)
         return loss

@@ -1,4 +1,4 @@
-CLASS_NAMES: ["chair", "sofa", "lamp", "table", "cabinet", "desk", "bench", "bed", "refridgerator"]
+CLASS_NAMES: ["chair", "sofa", "lamp", "table", "cabinet", "desk", "bed", "refridgerator"]
 
 DATA_CONFIG:
     _BASE_CONFIG_: cfgs/dataset_configs/kitti_dataset.yaml
@@ -45,7 +45,7 @@ MODEL:
         INPUT_FEATURES: 128
 
         CLASS_NAMES_EACH_HEAD: [
-            ["chair", "sofa", "lamp", "table", "cabinet", "desk", "bed", "bench", "refridgerator"],
+            ["chair", "sofa", "lamp", "table", "cabinet", "desk", "bed", "refridgerator"],
         ]
         
         SHARED_CONV_CHANNEL: 128
@@ -77,7 +77,7 @@ MODEL:
 
         POST_PROCESSING:
             SCORE_THRESH: 0.1
-            POST_CENTER_LIMIT_RANGE: [-27.401013300461674, -26.225578633232722, -0.7589571960270405, 27.215453945759858, 27.096006649192805, 3.6982860565185547]
+            POST_CENTER_LIMIT_RANGE: [-29.617572648217823, -29.649357568434397, -0.7589571960270405, 29.52696823131518, 29.529175673022657, 6.098352432250977]
             MAX_OBJ_PER_SAMPLE: 10
             NMS_CONFIG:
                 NMS_TYPE: nms_gpu

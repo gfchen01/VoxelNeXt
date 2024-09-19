@@ -17,8 +17,8 @@ def cls_type_to_id(cls_type):
         4: 'cabinet',
         5: 'desk',
         6: 'bed',
-        7: 'bench',
-        8: 'refridgerator',
+        # 7: 'bench',
+        7: 'refridgerator',
         }
     if cls_type not in type_to_id.keys():
         return -1

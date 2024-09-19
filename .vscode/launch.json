@@ -14,8 +14,9 @@
             "args": [
                 "--cfg_file", "cfgs/kitti_models/voxelnext.yaml",
                 // "--extra_tag", "single_obj",
-                "--ckpt", "../output/kitti_models/voxelnext/single_obj_v2/ckpt/checkpoint_epoch_400.pth",
-                "--data_path", "../data/custom_data_v4",
+                "--ckpt", "../output/kitti_models/voxelnext/v3_real_stack10/ckpt/checkpoint_epoch_1000.pth",
+                // "--data_path", "../data/custom_data_v4",
+                // "--extra_tag", "v3_real_stack10",
             ]
         }
     ]

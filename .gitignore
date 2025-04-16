@@ -15,3 +15,6 @@ version.py
 .DS_Store
 
 data/*
+
+!data/*.py
+!data/*.sh
